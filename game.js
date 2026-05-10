@@ -509,7 +509,8 @@
       // 每一关增加敌方数量：在原 aiSpawns 基础上，额外 + (关卡序号 + 1) 个
       // 例如：第 1 关（index=0）+1，第 2 关 +2，第 3 关 +3 ...
       const baseSpawns = level.aiSpawns?.length ? level.aiSpawns : [{ x: GRID_W - 3, y: 2 }];
-      const enemyCount = baseSpawns.length + (this.levelIndex + 1);
+      // 每一关再多增加一人：在上一版基础上整体 +1
+      const enemyCount = baseSpawns.length + (this.levelIndex + 2);
 
       const tryFindSpawnNear = (baseTileX, baseTileY) => {
         const tankW = 28;
