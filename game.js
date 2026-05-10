@@ -506,10 +506,46 @@
       this.player.dir = Dir.Up;
 
       this.enemies = [];
-      for (const sp of level.aiSpawns) {
-        const ex = sp.x * TILE + (TILE - 28) / 2;
-        const ey = sp.y * TILE + (TILE - 28) / 2;
-        const t = new Tank(ex, ey, "enemy");
+      // 每一关增加敌方数量：在原 aiSpawns 基础上，额外 + (关卡序号 + 1) 个
+      // 例如：第 1 关（index=0）+1，第 2 关 +2，第 3 关 +3 ...
+      const baseSpawns = level.aiSpawns?.length ? level.aiSpawns : [{ x: GRID_W - 3, y: 2 }];
+      const enemyCount = baseSpawns.length + (this.levelIndex + 1);
+
+      const tryFindSpawnNear = (baseTileX, baseTileY) => {
+        const tankW = 28;
+        const tankH = 28;
+        const toPixel = (tx, ty) => ({
+          x: tx * TILE + (TILE - tankW) / 2,
+          y: ty * TILE + (TILE - tankH) / 2,
+        });
+
+        // 从目标出生点开始，向外圈扩散，找最近可用的空地（避免刷在墙里/重叠）
+        for (let r = 0; r <= 6; r++) {
+          for (let dy = -r; dy <= r; dy++) {
+            for (let dx = -r; dx <= r; dx++) {
+              if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue; // 只扫外圈
+              const tx = baseTileX + dx;
+              const ty = baseTileY + dy;
+              if (tx < 0 || tx >= GRID_W || ty < 0 || ty >= GRID_H) continue;
+              if (tileIsSolid(this.map[ty][tx])) continue;
+
+              const p = toPixel(tx, ty);
+              const rect = { x: p.x, y: p.y, w: tankW, h: tankH };
+              if (this.rectHitsSolidTile(rect)) continue;
+              if (this.rectHitsAnyTank(rect, null)) continue;
+              return p;
+            }
+          }
+        }
+        return null;
+      };
+
+      for (let i = 0; i < enemyCount; i++) {
+        const sp = baseSpawns[i % baseSpawns.length];
+        const pos = tryFindSpawnNear(sp.x, sp.y);
+        if (!pos) continue;
+
+        const t = new Tank(pos.x, pos.y, "enemy");
         t.dir = choice(DIRS);
         // 随关卡提升一点进攻性
         t.fireInterval = clamp(0.95 - this.levelIndex * 0.12, 0.55, 1.0);
@@ -519,7 +555,9 @@
 
       this.state = "playing";
       this._levelJustLoaded = true;
-      this.tip(`关卡 ${this.levelIndex + 1}：${level.name}（清空敌人过关）`);
+      this.tip(
+        `关卡 ${this.levelIndex + 1}：${level.name}（敌人 x${this.enemies.filter((e) => e.alive).length}，清空过关）`
+      );
       this.updateUI();
     }
 
